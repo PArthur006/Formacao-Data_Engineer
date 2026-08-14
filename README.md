@@ -10,7 +10,7 @@ Ao longo da formação, a ideia é consolidar fundamentos de programação, mani
 
 ```text
 Formacao-Data_Engineer/
-├── 01-Fundamentos-de-Programacao-e-Dados/
+├── 01-Fundamentos-de-Programacao-e-Dados/ (Em Andamento)
 │   ├── 01-Introducao-a-Engenharia-de-Dados/
 │   ├── 02-Shell-Script/
 │   ├── 03-Logica-de-Programacao_Python-Basico/
