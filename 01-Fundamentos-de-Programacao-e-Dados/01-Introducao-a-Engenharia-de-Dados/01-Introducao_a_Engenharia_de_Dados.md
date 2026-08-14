@@ -65,3 +65,30 @@ Isso ocorreu porquê Bancos de Dados analíticos em nuvem (Snowflake e BigQuery)
 
 Ao contrário do ETL legado, onde os atributos descartados no estágio de transformação eram perdidos para sempre, o ELT armazena o dado bruto original. Se uma regra de negócios for alterada no futuro, ou se o time descobrir dados ausentes, basta reprocessar todo o pipeline a partir dos dados brutos preservados no Staging, sem necessidade de re-extrair dados do sistema de origem original.
 
+
+## 3. Arquitetura de Armazenamento e Processamento
+
+Para projetar sistemas analíticos modernos e resilientes, o engenheiro de dados deve dominar a fundo a evolução das asbtrações de armazenamento e as dinâmicas de processamento.
+
+### Paradigmas de Processamento de Dados: Batch vs. Streaming
+
+No dia a dia do desenvolvimento de pipelines, a escolha entre processar dados em lotes ou de forma contínua dita não apenas as ferramentas utilizadas, mas a latência da informação entregue ao negócio.
+
+| Tipo | Processamento |
+| :---: | :---: |
+| Batch | Dados Ilimitados - Fronteira de Tempo -> Lote Banhado -> Transformações OLAP |
+| Streaming | Dados Ilimitados - Event-by-Event -> Motor em Tempo Real -> Baixa Latência |
+
+#### Processamento em Lote (Batch Processing)
+
+Embora os dados no mundo real sejam gerados de forma contínua e ilimitada, o processamento em lote consiste em isolar artificialmente esses fluxos em blocos delimitados por tempo ou tamanho (dados limitados). As tarefas de lote são agendadas para rodar em intervalos fixos (diários, horários ou a cada 15 minutos).
+
+Ao extrair snapshots ou arquivos em lote (como CSVs ou dumps de bancos transacionais), o engenheiro de dados deve aplicar **mascaramento de dados e  hashing unidirecional (SHA-256)** diretamente no momento da ingestão ou na primeira camada de preparação (Staging Area). Dados confidenciais de PII (_Personally Identifiable Information_, como e-mails e CPFs) nunca devem transitar sem criptografia ou anonimização para as camadas analíticas de downstream.
+
+O mercado corporativo adota o lote como padrão na esmagadora maioria dos casos por três motivos principais:
+
+- Baixo custo computacional;
+- Simplicidade de manutenção;
+- Alinhamento com as tomadas de decisão empresariais;
+
+Motores OLAP executam varreduras maciças e otimizadas sobre esses blocos estáticos de dados com alta eficiência de custos.
