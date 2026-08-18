@@ -92,3 +92,75 @@ O mercado corporativo adota o lote como padrão na esmagadora maioria dos casos 
 - Alinhamento com as tomadas de decisão empresariais;
 
 Motores OLAP executam varreduras maciças e otimizadas sobre esses blocos estáticos de dados com alta eficiência de custos.
+
+Ao extrair snapshots ou arquivos em lote (como CSVs ou dumps de bancos transacionais), o engenheiro de dados deve aplicar mascaramento de dados e hashing unidirecional (SHA-256) diretamente no momento da ingestão ou na primeira camada de preparação (Staging Area). Dados confidenciais de PII (Personally Identifiable information, como e-mails e CPFs) nunca devem transitar sem criptografia ou anonimização para as camadas analíticas de downstream.
+
+#### Processamento em Fluxo (Streaming Processing)
+
+O processamento em fluxo (streaming) lida com o dado em seu estado natural: ilimitado, contínuo e orientado a eventos. Plataformas como Apache Kafka e Amazon Kinesis são utilizadas para manter e persistir temporariamente esse fluxo.
+
+Ao processar streams, o engenheiro de dados precisa lidar com as sutilezas do tempo: 
+
+- **Tempo do Evento:** Quando ocorreu na origem;
+- **Tempo de Ingestão:** Quando entrou no pipeline;
+- **Tempo de Processamento:** Quando foi transformado;
+
+Para realizar agregações estatísticas, como médias móveis, utilizam-se janelas temporais para tornar o dado ilimitado temporariamente limitado:
+
+1. **Janelas Fixas/Tumbling:** Divisões em tempo fixas e não sobrepostas (ex: blocos de 20 segundos);
+2. **Janelas Deslizantes/Sliding:** Janelas com tempo de duração fixo que se sibrepõem ao avançar em intervalos menores (ex: a cada 30 segundos processa o último minuto), ideais para médias móveis;
+3. **Janelas de Sessão:** Agrupamentos baseados na atividade do usuário, encerrando-se após um limite de inatividade;
+
+O mercado utiliza processamento contínuo estritamente para casos de **extrema sensibilidade à latência**, como detecção de fraudes financeiras em tempo real ou monitoramento crítico de IoT. O custo e a complexidade técnica para depurar, lidar com dados atrasados usando marcas d'água (watermarks) e evitar perda de mensagens são significativamente maiores do que no modelo em lote.
+
+Para dados de streaming, o mascaramento de PII deve ser feito "in-flight" (em trânsito). Funções sem servidor, como AWS Lambda ou Google Cloud Functions, ou processadores de fluxo, como Apache Spark Streaming, devem interceptar o evento e hashear as chaves de identificação pessoal antes que o registro seja gravado em disco no storage analítico.
+
+
+### Abstrações de Armazenamento: Data Warehouse, Lake e LakeHouse
+
+O desenho da infraestrutura de dados analíticos evoluiu para suportar diferentes volumes, variedades e velocidades de dados.
+
+#### Data Warehouse
+    - Suporta apenas dados estruturados;
+    - Utiliza o Schema-on-Write, rígido na gravação;
+    - As transações ACID são complexas e nativas;
+    - Possui um alto custo de armazenamento, historicamente acoplado à computação;
+
+O **Data Warehouse (DWH)** é um hub de dados central analítico que se baseia na clássica definição de Bill Inmon: um repositório integrado, não volátil, variante com o tempo e orientado a assuntos.
+
+É projetado especificamente para separar o processamento transacional (OLTP) de produção do processamento analíico (OLAP). O mercado utiliza o Data Warehouse porque ele oferece consultas SQL de altíssimo desempenho e baixa latência para analistas de negócios, impulsionado por bancos colunares MPP (Massively Parallel Processing) como Snowflake, BigQuery e Amazon Redshift. A organização típica desses dados baseia-se na modelagem dimensional de Ralph Kimball (esquema estrela com tabelas de fatos e dimensões) e na disponibilização de dados especializados via Data Marts.
+
+Por gerenciar metadados e esquemas internamente, o DWH facilita o controle de acesso granular de dados por meio de linguagens de controle (DCL) como `GRANT` e `REVOKE` no nível de colunas e linhas. No entanto, a carga de dados deve passar por transformações (ex: via dbt) que limpam, padronizam e aplicam criptografia de dados sensíveis antes que fiquem visíveis para os usuários finais.
+
+#### Data Lake
+
+    - Suporta todos os tipos de dados: Estruturados, semi e não estruturados;
+    - Usa do Schema-on-Read, com flexibilidade na leitura;
+    - As transações ACID são praticamente inexistentes, com uma difícil implementação manual;
+    - Tem um custo de armazenamento muito baixo, pelo Object Storage desacoplado;
+
+Com a explosão do volume de dados gerados pela internet e dispositivos conectados, o Data Warehouse tradicional tornou-se caro e rígido demais para armazenar logs compelxos e mídias. Surgiu o **Data Lake**, que atua como um imenso repositório para despejar qualquer tipo de dado, seja estruturado, semiestruturado como JSON ou Parquet, e não estruturado como áudio ou imagens, em seu formato original bruto.
+
+Historicamente construiídos sobre o ecossistema hadoop (HDFS) e migrados massivamente para o armazenamento de objetos em nuvem (Amazon S3, Google Cloud Storage), os Data Lakes são amplamente utilizados devido ao baixíssimo custo de armazenamento e ao total desacoplamento entre computação e armazenamento. O engenheiro de dados pode carregar o dado imediatamente sem gastar tempo desenhando esquemas complexos (abordagem _schema-on-read_).
+
+Sem governança de metadados, catálogos e qualidade de dados, o Data Lake inevitavelmente se transforma em um **Data Swamp**. Além disso, o conceito original era estritamente baseado no padrão _write-onde_, _read-many_ (WORM). Isso gerou uma crise grave de segurança com a chegada das leis de privacidade. Se um cliente acionar o "direito de ser esquecido" e solicitar a exclusão de seus dados pessoais, o engenheiro de dados em um Data Lake Clássico precisava reconstruir arquivos Parquet inteiros manualmente em lote, pois não havia suporte nativo a comandos SQL simples de atualização ou exclusão analítica (`UPDATE`ou  `DELETE`).
+
+#### Data Lakehouse
+
+    - Suporta todos os tipos de dados: Estruturados, semi e não estruturados;
+    - Schema-on-Write para tabelas estruturadas e Schema-on-Read para arquivos brutos;
+    - Transações ACID completas e nativas via metadados abertos;
+    - Custo de armazenamento muito baixo, pelo Object Storage com computação elástica;
+
+Para resolver as limitações de conformidade do Data Lake e a rigidez/alto custo do Data Warehouse, o mercado desenvolveu a arquitetura de **Data Lakehouse**. O Lakehouse armazena os dados no barato armazenamento de objetos (como o S3), mas introduz uma camada de gerenciamento de arquivos e metadados abertos (Delta Lake, Apache Iceberg ou Apache Hudi) diretamente sobre os arquivos, como Parquet.
+
+| Data Lakehouse |
+| :---: |
+| **Camada de Consulta** (SQL, BI, Machine Learning, Python) |
+| **Camada de Metadados / Transações ACID** (Delta, Iceberg) |
+| **Armazenamento de Objetos Imutável** (Amazon S3, GCS) |
+| |
+
+O Lakehouse suporta transações ACID (Atomicidade, consistência, isolamento e durabilidade), garantindo a consistência das leituras simultâneas e integridade dos esquemas analíticos. O mercado adota essa arquitetura porque ela permite centralizar a infraestrutura: cientistas de dados e engenheiros de ML acessam arquivos não estruturados brutos de imagem e áudio, enquanto analistas de BI e relatórios consultam tabelas estruturadas e otimizadas diretamente no mesmo local, eliminando redundâncias e custos desnecessários de movimentação de dados (ETL).
+
+No cotidiano do engenheiro de dados, trabalhar com formatos de tabelas como Delta Lake, Hudi ou Iceberg permite a utilização de comandos DML complexos, como `MERGE` e `UPSERT`. Em conformidade com a LGPD, o esquecimento de dados pessoais torna-se simples: executa-se uma instrução de deleção direcionada que altera apenas os metadados e os pointers da tabela, preservando a imutabilidade física do storage subjacente e gerando versões históricas de rollback de forma automatizada.
