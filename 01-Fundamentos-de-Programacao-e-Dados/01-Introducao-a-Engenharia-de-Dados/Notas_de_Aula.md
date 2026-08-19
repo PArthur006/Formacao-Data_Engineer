@@ -9,158 +9,140 @@ O **curso Introdução à Engenharia de Dados** foi criado para quem deseja com
 
 ## 1. O Que é a Engenharia de Dados?
 
-Engenharia de dados é o desenvolvimento, implementação e manutenção de sistemas e processos que recebem dados brutos e produzem informações consistentes e de alta qualidade para suportar casos de uso downstream, como análise de dados e machine learning.
+A Engenharia de Dados projeta, constrói e mantém a infraestrutura que transforma dados brutos em ativos confiáveis, seguros e de alta qualidade. Ela sustenta as camadas downstream (Analytics, BI, Data Science e Machine Learning), eliminando o gargalo operacional em que cientistas de dados perdem a maior parte do tempo limpando dados em vez de gerar inteligência de negócio.
 
-No mercado corporativo, cerca de 70% a 80% do tempo de um Cientista de Dados é desperdiçado de forma desorganizada coletando, limpando e preparando dados. Cientistas não são treinados para construir sistemas tolerantes a falhas, escaláveis e em nível de produção
-O Engenheiro de Dados entra em cena para assumir as três camadas da base dessa pirâmide: **Coleta, Armazenamento e Transformação**. Ele garante que i pipeline não quebre, que a arquitetura seja econômica e que o dado chegue limpo, seguro e pronto.
+### Papel e Responsabilidade do Engenheiro
 
-### O Ciclo de Vida dos Dados
+- Assume a infraestrutura de Coleta, Armazenamento e Transformação de dados.
+- Garante a resiliência (tolerância a falhas), escalabilidade, governança/segurança e eficiência de custos.
+- Cientistas de dados focam em modelagem estatística e preditiva, enquanto engenheiros de dados focam na estabilidade do fluxo de produção.
 
-O ciclo de vida geral dos dados abrange toda a vida útil do dado na terra, desde a criação até o descarte ou arquivamento final. É o processo que inclui a geração, coleta, processamento, armazenamento, análise, visualização e eventual eliminação ou arquivamento.
+### As 5 Etapas do Ciclo de Vida da Engenharia de Dados
 
-O ciclo de Vida da Engenharia de Dados é dividido em 5 etapas sequenciais
+1. **Geração (Origem Externa):** Criação dos dados em fontes transacionais (OLTP, IoT, APIs de terceiros).
+    - Ex: PostgreSQL, Salesforce API.
+2. **Ingestão (Movimentação):** Transporte do ponto de origem para a infraestrutura de dados (modos Push/Pull, em Batch ou Streaming). 
+    - Ex: Airbyte, Fivetran.
+3. **Armazenamento (Persistência):** Local onde os dados residem e persistem durante todo o ciclo.
+    - Ex: AWS S3, Snowflake, Google BigQuery.
+4. **Transformação (Modelagem):** Processamento que converte o dado bruto em formato limpo, estruturado e aderente às regras de negócio.
+    - Ex: dbt.
+5. **Disponibilização (Consumo):** Entrega do dado tratado para o ecossistema final: Dashboards de BI, Feature Stores para ML ou ferramentas operacionais via Reverse ETL.
+    - Ex: Power BI, Hightouch.
 
-1. **Geração:** Sistemas de origem que criam o dado (OLTP, IoT, APIs de terceiros). Nós não os controlamos, mas precisamos entendê-los.
-    - Exemplo de Stack: PostgreSQL de produção, APIs REST do Salesforce
-2. **Ingestão:** O processo de mover o dado do ponto A para o ponto B (Push, Pull, Batch ou Streaming).
-    - Exemplo de Stack: Airbyte ou Divetran puxando dados via API e jogando no Storage.
-3. **Armazenamento:** Onde os dados persistem ao longo de todo o ciclo.
-    - Exemplo de Stack: Amazon S3 (Object Storage), Snowflake ou Google BigQuery.
-4. **Transformação:** Alterar o dado de sua forma bruta para um formato útil e modelado para o negócio.
-    - Exemplo de Stack: dbt (Data Build Tool) executando transformações SQL no Warehouse.
-5. **Disponibilização:** Entregar o dado de alta qualidade para consumo downstream (BI, Machine Learning e ETL Reverso).
-    - Exemplo de Stack: PowerBI (BI), Feature Store (ML) ou Hightouch (ETL Reverso)
+Sem uma engenharia sólia nas etapas 1 a 4, as pontas analíticas operam sobre dados inconsistentes ou enfrentam quebras constantes de pipeline.
 
 ---
 
 ## 2. Arquitetura de Pipelines de Dados
 
-No ecossistema moderno de dados, a eficiência na entrega de informações limpas e prontas para uso analítico reside na qualidade do design das suas tubulações de dados.
+Um Pipeline de Dados é o conjunto de arquitetura, sistemas e processos projetados para movimentar, tratar e disponibilizar dados ao longo de seu ciclo de vida. A transição de **ETL** (legado/on-premise) para **ELT** (moderno/cloud) foi impulsionada pela redução de custos de armazenamento e pelo desacoplamento entre poder computacional e disco.
 
-### Anatomia e Definição de um Pipeline de Dados
+### ETL vs. ELT
 
-Para o mercado corporativo, um pipeline de dados é a combinação de arquitetura, sistemas e processos que movem os dados pelas etapas do ciclo de vida da engenharia de dados.
+| ATRIBUTO | ETL (Extract, Transform, Load) | ELT (Extract, Load, Transform) |
+| :--- | :--- | :--- |
+| Paradigma | Legado (anos 1980-2000; on-premise) | Moderno (Cloud-native; elástico) |
+| Gargalo Histórico | Armazenamento e computação analítica caros. | Nenhum; Infraestrutura em nuvem barata e elástica |
+| Onde Ocorre a Transformação | Servidor/motor intermediário externo (Spark, MapReduce) | Dentro do próprio Data Warehouse/Lakehouse (Big Query, SnowFlake) |
+| Preservação de Dados Brutos | NÃO. Dados não selecionados/transformados são descartados | SIM. Dados brutos persistem intactos no Staging/Object Storage. |
+| Reprocessamento Histórico | Difícil/Impossível sem re-extrair da fonte de origem. | Simples: Reprocessa a partir do dado bruto já armazenado. |
+| Stack Típica | Servidores dedicados de processamento + Data Marts | Ferramentas de ingestão (Airbyte/Fivetran) + S3/DW + SQL/dbt |
 
-Embora o ciclo completo envolva a geração na origem, é na etapa de ingestão que o engenheiro de dados começa a projetar ativamente as regras de fluxo e controle do pipeline. Na arquitetura moderna, esses pipelines devem ser flexíveis o suficiente para conectar desde uma única fonte transacional local até centenas de APIs e plataformas SaaS distribuídas globalmente.
+#### Detalhamento dos Fluxos
 
-### ETL (Extract, Transform, Load)
+**Fluxo ETL:**
 
-O ETL foi desenhado entre os anos 1980 e 2000, uma era em que o poder de processamento e, principalmente, a capacidade de armazenamento de dados analíticos eram extremamente caros e severamente limitados. Os sisteams de destino (data Warehouses) não tinham CPU ou espaço em disco redundantes para processar transformações complexas. Portanto, era obrigatório processar, limpar e reduzir o tamanho do dado em um servidor externo antes de enviá-lo ao Warehouse, garantindo que apenas dados agregados e otimizados fossem salvos no destino final.
+1. **Extract:** Extração de snapshots ou logs transacionais (OLTP);
+2. **Transform:** Limpeza, joins, tipagem e agregações em nó intermediário para reduzir volume antes do destino;
+3. **Load:** Carga do dado final já modelado (ex: Kimball) no Data Warehouse;
 
-O ETL é o padrão legado de movimentação de dados. O fluxo de controle de um pipeline de ETL opera de forma sequencial e síncrona:
+#### Relações e Dependências Críticas
 
-1. **Extract:** Recuperação de snapshots ou logs incrementais diretamente dos bancos de dados de produção (Sistemas OLTP).
-2. **Transform:** Os dados brutos extraídos passam por uma máquina de processamento intermediária (um servidor de ETL dedicado ou motor como Apache Spark/Map Reduce). É nessa camada intermediária que ocorrem as etapas de limpeza de tipos, joins estruturais, filtragem de registros nulos e normalização.
-3. **Load (Carga):** O dado, agora já limpo, transformado e modelado conforme as regras do negócio, é carregado na estrutura de destino (como o Data Warehouse ou um Data Mart sob modelagem de Kimball).
+- A nuvem viabiliza o ETL porque permite guardar volumes massivos a custo irrisório e alocar CPU/memória sob demanda apenas na execução das queries de transformação.
+- No ELT, o armazenamento do dado bruto desacopla o pipeline da volatilidade das regras analíticas. Alterações de regra de negócio demandam apenas uma nova query sobre o Staging, sem onerar as bases transacionais de produção.
 
-### ELT (Extract, Load, Transform)
-
-Com a ascenção da computação em nuvem e a drástica redução dos custos de armazenamento e processamento elástico, o mercado migrou massivamente para o ETL:
-
-1. **Extract:** O engenheiro extrai os dados diretamente do sistema de origem sem apicar transformações de negócio prévias.
-2. **Load:** Os dados são despejados exatamente em seu formato bruto em uma área de preparação dedicada (Staging Area), localizada dentro do próprio Data Warehouse analítico (como SnowFlake, BigQuery ou Redshift) ou em sistemas de Object Storage (como Amazon S3).
-3. **Transform:** As transformações de negócio, agregações e modelagens analíticas (esquemas estrela/Kimball, tabelas de fatos e dimensões) ocorrem diretamente dentro do Data Warehouse de destino, utilizando ferramentas declarativas baseadas em SQL.
-
-Isso ocorreu porquê Bancos de Dados analíticos em nuvem (Snowflake e BigQuery) popularizaram a dissociação de processamento e disco. O armazenamento em S3 ou Google Cloud Storage é virtualmente infinito e baratíssimo. É possível ligar ou desligar nós de computação massiva sob demanda para rodar consultas pesadas apenas quando necessário.
-
-Ao contrário do ETL legado, onde os atributos descartados no estágio de transformação eram perdidos para sempre, o ELT armazena o dado bruto original. Se uma regra de negócios for alterada no futuro, ou se o time descobrir dados ausentes, basta reprocessar todo o pipeline a partir dos dados brutos preservados no Staging, sem necessidade de re-extrair dados do sistema de origem original.
-
+---
 
 ## 3. Arquitetura de Armazenamento e Processamento
 
-Para projetar sistemas analíticos modernos e resilientes, o engenheiro de dados deve dominar a fundo a evolução das asbtrações de armazenamento e as dinâmicas de processamento.
+A escolha entre **Batch** e **Streaming** define a latência de entrega, a complexidade operacional e o custo da infraestrutura. Enquanto o Batch impõe fronteiras temporais artificiais sobre fluxos contínuos, o Streaming processa eventos em seu estado natural em tempo real.
 
-### Paradigmas de Processamento de Dados: Batch vs. Streaming
+| ATRIBUTO | PROCESSAMENTO EM LOTE (Batch) | PROCESSAMENTO EM FLUXO (Streaming) |
+| --- | --- | --- |
+Natureza dos Dados | Limitados (_Bounded_ por tempo/tamanho) | Ilimitados (_Unbounded_, orientados a eventos) 
+Latência | Média a alta (minutos, horas, dias) | Sub-segundo a poucos segundos
+Custo & Complexidade | Baixo custo relativo; manutenção simples | Alto custo computacional; alta complexidade
+Gatilho de Execução | Agendamentos fixos (_schedules_) | Chegada contínua de eventos (_event-driven_)
+Casos de Uso Típicos | Relatórios diários, fechamento contábil, BI | Fraude em tempo real, telemetria/IoT crítica
+Stack Típica | Airflow, dbt, SnowFlake, Spark Batch | Apache Kafka, AWS Kenisis, Spark Streaming, Flink
 
-No dia a dia do desenvolvimento de pipelines, a escolha entre processar dados em lotes ou de forma contínua dita não apenas as ferramentas utilizadas, mas a latência da informação entregue ao negócio.
+O processamento em lote permanece como padrão da indústria por atender à cadência de tomada de decisão da maioria das empresas sem inflacionar custos de infraestrutura. O streaming é reservado estritamente para cenários onde a latência sub-segundo dita o valor do negócio.
 
-| Tipo | Processamento |
-| :---: | :---: |
-| Batch | Dados Ilimitados - Fronteira de Tempo -> Lote Banhado -> Transformações OLAP |
-| Streaming | Dados Ilimitados - Event-by-Event -> Motor em Tempo Real -> Baixa Latência |
+### Fundamentos de Streaming e Janelas Temporais
 
-#### Processamento em Lote (Batch Processing)
+Para aplicar agregações analíticas (médias, constantes) sobre fluxos contínuos, delimita-se o dado por meio de janelas de tempo:
 
-Embora os dados no mundo real sejam gerados de forma contínua e ilimitada, o processamento em lote consiste em isolar artificialmente esses fluxos em blocos delimitados por tempo ou tamanho (dados limitados). As tarefas de lote são agendadas para rodar em intervalos fixos (diários, horários ou a cada 15 minutos).
+- **Dimensões Temporais:**
+    - Tempo do Evento (_Event Time_): Momento exato em que o fato ocorreu na origem;
+    - Tempo de Ingestão (_Ingestion Time_): Momento em que o evento atingiu o broker/pipeline;
+    - Tempo de Processamento (_Processing Time_): Momento em que o motor executa a transformação;
+- **Tipos de Janelas:**
+    - Tumbling (Fixas): Intervalos contíguos e não sobrepostos (ex: a cada 5 min).
+    - Sliding (Deslizantes): Intervalos de duração fixa com sobreposição (ex: média da última hora recalculada a cada 10 min).
+    - Sessão (Session): Agrupamento baseado em períodos de atividade, fechando após um limite (gap) de inatividade.
+- **Tolerância a Atrasos:** Uso de marcas d'água (_watermarks_) para definir limites de tolerância para eventos atrasados no tempo do evento.
 
-Ao extrair snapshots ou arquivos em lote (como CSVs ou dumps de bancos transacionais), o engenheiro de dados deve aplicar **mascaramento de dados e  hashing unidirecional (SHA-256)** diretamente no momento da ingestão ou na primeira camada de preparação (Staging Area). Dados confidenciais de PII (_Personally Identifiable Information_, como e-mails e CPFs) nunca devem transitar sem criptografia ou anonimização para as camadas analíticas de downstream.
+### Segurança e Governança de PII (Personally Identifiable Information)
 
-O mercado corporativo adota o lote como padrão na esmagadora maioria dos casos por três motivos principais:
+A anonimização e a proteção de dados sensíveis (CPFs, e-mails) são obrigatórias antes da chegada aos consumidores analíticos:
 
-- Baixo custo computacional;
-- Simplicidade de manutenção;
-- Alinhamento com as tomadas de decisão empresariais;
+- **Em Batch:** Mascaramento e hashing unidirecional (ex: **SHA-256**) aplicados diretamente no momento da ingestão ou na _Staging Area_ (camada Raw/Bronze).
+- **Em Streaming:** Tratamento _in-flight_ (em trânsito) via processadores de stream ou funções serveless (AWS Lambda, Cloud Functions, Spark Streaming) antes da persistência em disco no armazenamento final.
 
-Motores OLAP executam varreduras maciças e otimizadas sobre esses blocos estáticos de dados com alta eficiência de custos.
-
-Ao extrair snapshots ou arquivos em lote (como CSVs ou dumps de bancos transacionais), o engenheiro de dados deve aplicar mascaramento de dados e hashing unidirecional (SHA-256) diretamente no momento da ingestão ou na primeira camada de preparação (Staging Area). Dados confidenciais de PII (Personally Identifiable information, como e-mails e CPFs) nunca devem transitar sem criptografia ou anonimização para as camadas analíticas de downstream.
-
-#### Processamento em Fluxo (Streaming Processing)
-
-O processamento em fluxo (streaming) lida com o dado em seu estado natural: ilimitado, contínuo e orientado a eventos. Plataformas como Apache Kafka e Amazon Kinesis são utilizadas para manter e persistir temporariamente esse fluxo.
-
-Ao processar streams, o engenheiro de dados precisa lidar com as sutilezas do tempo: 
-
-- **Tempo do Evento:** Quando ocorreu na origem;
-- **Tempo de Ingestão:** Quando entrou no pipeline;
-- **Tempo de Processamento:** Quando foi transformado;
-
-Para realizar agregações estatísticas, como médias móveis, utilizam-se janelas temporais para tornar o dado ilimitado temporariamente limitado:
-
-1. **Janelas Fixas/Tumbling:** Divisões em tempo fixas e não sobrepostas (ex: blocos de 20 segundos);
-2. **Janelas Deslizantes/Sliding:** Janelas com tempo de duração fixo que se sibrepõem ao avançar em intervalos menores (ex: a cada 30 segundos processa o último minuto), ideais para médias móveis;
-3. **Janelas de Sessão:** Agrupamentos baseados na atividade do usuário, encerrando-se após um limite de inatividade;
-
-O mercado utiliza processamento contínuo estritamente para casos de **extrema sensibilidade à latência**, como detecção de fraudes financeiras em tempo real ou monitoramento crítico de IoT. O custo e a complexidade técnica para depurar, lidar com dados atrasados usando marcas d'água (watermarks) e evitar perda de mensagens são significativamente maiores do que no modelo em lote.
-
-Para dados de streaming, o mascaramento de PII deve ser feito "in-flight" (em trânsito). Funções sem servidor, como AWS Lambda ou Google Cloud Functions, ou processadores de fluxo, como Apache Spark Streaming, devem interceptar o evento e hashear as chaves de identificação pessoal antes que o registro seja gravado em disco no storage analítico.
-
+Em ambos os paradigmas, a regra de ouro de governança é a mesma: dados sensíveis nuncan devem ser persistidos desprotegidos nas camadas intermediárias ou finais de consumo.
 
 ### Abstrações de Armazenamento: Data Warehouse, Lake e LakeHouse
 
-O desenho da infraestrutura de dados analíticos evoluiu para suportar diferentes volumes, variedades e velocidades de dados.
+A arquitetura de armazenamento analítico evoluiu em três gerações para equilibrar desempenho, flexibilidade de tipos de dados, custo e governança:
 
-#### Data Warehouse
-    - Suporta apenas dados estruturados;
-    - Utiliza o Schema-on-Write, rígido na gravação;
-    - As transações ACID são complexas e nativas;
-    - Possui um alto custo de armazenamento, historicamente acoplado à computação;
+1. **Data Warehouse:** Estruturado, transações ACID e consultas SQL ultra-rápidas, mas rígido e caro.
+2. **Data Lake:** Barato, elástico e aberto a qualquer formato bruto, mas sem governança nativa e sem suporte direto a mutações ACID.
+3. **Data Lakehouse:** Combina o baixo custo do _Object Storage_ do Data Lake com o controle transacional ACID, governança e desempenho do Data Warehouse.
 
-O **Data Warehouse (DWH)** é um hub de dados central analítico que se baseia na clássica definição de Bill Inmon: um repositório integrado, não volátil, variante com o tempo e orientado a assuntos.
+DIMENSÃO | DATA WAREHOUSE (DWH) | DATA LAKE | DATA LAKEHOUSE
+| --- | --- | --- | --- |
+Tipos de Dados | Apenas Estruturados | Todos: Estruturados, Semi e Não Estruturados | Todos: Estruturados, Semi e Não Estruturados
+Abordagem de Esquema | Schema-on-Write (rígido na gravação) | Schema-on-Read (Flexível na Leitura) | Híbrido: Schema-on-Write em tabelas + Schema-on-Read no Raw
+Transações ACID | Nativas e Completas | Inexistentes ou manuais/complexas | Nativas e completas via camada de metadados
+Custo de Storage | Médio a Alto | Muito Baixo (Object Storage / S3 / GCS) | Muito Baixo (Object Storage + computação elástica)
+Padrão da Mutação | `UPDATE`, `DELETE`, `MERGE` nativos | Imutável / WORM (recriação de arquivos em lote) | `UPDATE`, `DELETE`, `MERGE` via ponteiros de metadados
+Consumidores Típicos | Analistas de BI e SQL | Cientistas de Dados e Engenheiros de ML | Unificado: BI, SQL, ML, Data Sciente e Apps
+Stack de Referência | Snowflake, BigQuery, Redshift | Hadoop (HDFS), AWS S3, Google Cloud Storage | Delta Lake, Apache Iceberg, Apache Hudi
 
-É projetado especificamente para separar o processamento transacional (OLTP) de produção do processamento analíico (OLAP). O mercado utiliza o Data Warehouse porque ele oferece consultas SQL de altíssimo desempenho e baixa latência para analistas de negócios, impulsionado por bancos colunares MPP (Massively Parallel Processing) como Snowflake, BigQuery e Amazon Redshift. A organização típica desses dados baseia-se na modelagem dimensional de Ralph Kimball (esquema estrela com tabelas de fatos e dimensões) e na disponibilização de dados especializados via Data Marts.
+#### Data Warehouse (DWH)
 
-Por gerenciar metadados e esquemas internamente, o DWH facilita o controle de acesso granular de dados por meio de linguagens de controle (DCL) como `GRANT` e `REVOKE` no nível de colunas e linhas. No entanto, a carga de dados deve passar por transformações (ex: via dbt) que limpam, padronizam e aplicam criptografia de dados sensíveis antes que fiquem visíveis para os usuários finais.
+- Objetivo: Isolar a carga analítica (OLAP) do banco transacional operacional (OLTP);
+- Modelagem: Estruturas dimensionais clássicas (esquema estrela de Kimball: Fatos e Dimensões) e Data Marts.
+- Governança: Controle de acesso granular via DCL (`GRANT`/`REVOKE` em tabelas, colunas e linhas).
+- Limitação: Custo elevado para armazenar mídias/logs brutos e incapacidade de lidar diretamente com arquivos não estruturados.
 
 #### Data Lake
 
-    - Suporta todos os tipos de dados: Estruturados, semi e não estruturados;
-    - Usa do Schema-on-Read, com flexibilidade na leitura;
-    - As transações ACID são praticamente inexistentes, com uma difícil implementação manual;
-    - Tem um custo de armazenamento muito baixo, pelo Object Storage desacoplado;
-
-Com a explosão do volume de dados gerados pela internet e dispositivos conectados, o Data Warehouse tradicional tornou-se caro e rígido demais para armazenar logs compelxos e mídias. Surgiu o **Data Lake**, que atua como um imenso repositório para despejar qualquer tipo de dado, seja estruturado, semiestruturado como JSON ou Parquet, e não estruturado como áudio ou imagens, em seu formato original bruto.
-
-Historicamente construiídos sobre o ecossistema hadoop (HDFS) e migrados massivamente para o armazenamento de objetos em nuvem (Amazon S3, Google Cloud Storage), os Data Lakes são amplamente utilizados devido ao baixíssimo custo de armazenamento e ao total desacoplamento entre computação e armazenamento. O engenheiro de dados pode carregar o dado imediatamente sem gastar tempo desenhando esquemas complexos (abordagem _schema-on-read_).
-
-Sem governança de metadados, catálogos e qualidade de dados, o Data Lake inevitavelmente se transforma em um **Data Swamp**. Além disso, o conceito original era estritamente baseado no padrão _write-onde_, _read-many_ (WORM). Isso gerou uma crise grave de segurança com a chegada das leis de privacidade. Se um cliente acionar o "direito de ser esquecido" e solicitar a exclusão de seus dados pessoais, o engenheiro de dados em um Data Lake Clássico precisava reconstruir arquivos Parquet inteiros manualmente em lote, pois não havia suporte nativo a comandos SQL simples de atualização ou exclusão analítica (`UPDATE`ou  `DELETE`).
+- Objetivo: Repositório centralizado de dados brutos e massivos em seus formatos originais (JSON, Parquet, imagens, áudio).
+- Mecanismo: Desacoplamento total entre armazenamento (S3/GCS) e computação (Spark).
+- Gatgalos Críticos:
+    - **Data Swamp:** Degradação em um "pântano de dados" por ausência de catálogos e controle de qualidade.
+    - **Incompatibilidade LGPD/GDPR:** Por seguir o modelo WORM (_Write Once, Read Many_), atender ao "direito ao esquecimento" exige reprocessar e reescrever partições inteiras de arquivos Parquet manualmente.
 
 #### Data Lakehouse
 
-    - Suporta todos os tipos de dados: Estruturados, semi e não estruturados;
-    - Schema-on-Write para tabelas estruturadas e Schema-on-Read para arquivos brutos;
-    - Transações ACID completas e nativas via metadados abertos;
-    - Custo de armazenamento muito baixo, pelo Object Storage com computação elástica;
-
-Para resolver as limitações de conformidade do Data Lake e a rigidez/alto custo do Data Warehouse, o mercado desenvolveu a arquitetura de **Data Lakehouse**. O Lakehouse armazena os dados no barato armazenamento de objetos (como o S3), mas introduz uma camada de gerenciamento de arquivos e metadados abertos (Delta Lake, Apache Iceberg ou Apache Hudi) diretamente sobre os arquivos, como Parquet.
-
-| Data Lakehouse |
-| :---: |
-| **Camada de Consulta** (SQL, BI, Machine Learning, Python) |
-| **Camada de Metadados / Transações ACID** (Delta, Iceberg) |
-| **Armazenamento de Objetos Imutável** (Amazon S3, GCS) |
-| |
-
-O Lakehouse suporta transações ACID (Atomicidade, consistência, isolamento e durabilidade), garantindo a consistência das leituras simultâneas e integridade dos esquemas analíticos. O mercado adota essa arquitetura porque ela permite centralizar a infraestrutura: cientistas de dados e engenheiros de ML acessam arquivos não estruturados brutos de imagem e áudio, enquanto analistas de BI e relatórios consultam tabelas estruturadas e otimizadas diretamente no mesmo local, eliminando redundâncias e custos desnecessários de movimentação de dados (ETL).
-
-No cotidiano do engenheiro de dados, trabalhar com formatos de tabelas como Delta Lake, Hudi ou Iceberg permite a utilização de comandos DML complexos, como `MERGE` e `UPSERT`. Em conformidade com a LGPD, o esquecimento de dados pessoais torna-se simples: executa-se uma instrução de deleção direcionada que altera apenas os metadados e os pointers da tabela, preservando a imutabilidade física do storage subjacente e gerando versões históricas de rollback de forma automatizada.
+- Estrutura em Camadas:
+    1. **Consumo:** SQL, BI, Modelos de Machine Learning e Python;
+    2. **Metadados & ACID:** Motores de tabela aberta (Delta Lake, Apache Iceberg, Apache Hudi);
+    3. **Armazenamento:** Object Storage imutável e de baixo custo (S3, GCS, ADLS);
+- Operações Avançadas:
+    - Suporte nativo a `MERGE`, `UPSERT` e `DELETE`;
+    - **Versionamento & Rollback:** _Time Travel_ através do histórico de logs e metadados;
+    - **Privacidade e LGPD:** A deleção ou anonimização de registros altera os ponteiros e metadados lógicos sem demandar a recriação manual destrutiva do storage subjacente;
+- **Eliminação de Silos:** O Lakehouse elimina a necessidade de duplicar dados do Lake para um DWH separado, unificando a fonte de verdade para ciência de dados e inteligência de negócios em uma única camada de governança.
