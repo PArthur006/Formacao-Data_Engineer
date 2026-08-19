@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net">
   <diagram name="Página-1" id="kQ8gdktnMo1KXhgOjoO1">
-    <mxGraphModel dx="2150" dy="2332" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="1293" dy="1716" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -94,6 +94,9 @@
         <mxCell id="MCqAfT67lG_LnNrZK8-r-13" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Clientes&lt;div&gt;Vendas&lt;/div&gt;&lt;div&gt;CPF_Validos&lt;/div&gt;&lt;div&gt;Custo_rota&lt;/div&gt;" vertex="1">
           <mxGeometry height="65" width="105" x="855" y="-530" as="geometry" />
         </mxCell>
+        <mxCell id="MCqAfT67lG_LnNrZK8-r-25" edge="1" parent="1" source="MCqAfT67lG_LnNrZK8-r-14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="MCqAfT67lG_LnNrZK8-r-18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
         <mxCell id="MCqAfT67lG_LnNrZK8-r-14" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" value="DataMart" vertex="1">
           <mxGeometry height="140" width="105" x="1035" y="-690" as="geometry" />
         </mxCell>
@@ -104,7 +107,7 @@
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="MCqAfT67lG_LnNrZK8-r-18" parent="1" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://icons.diagrams.net/icon-cache1/CSS_Vol_3-2666/screen-769.svg;strokeWidth=0;" value="" vertex="1">
-          <mxGeometry height="105" width="105" x="1225" y="-667.5" as="geometry" />
+          <mxGeometry height="105" width="105" x="1225" y="-672.5" as="geometry" />
         </mxCell>
         <mxCell id="MCqAfT67lG_LnNrZK8-r-19" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=top;rounded=0;" value="relatório de vendas por cliente" vertex="1">
           <mxGeometry height="65" width="105" x="1225" y="-562.5" as="geometry" />
