@@ -52,3 +52,42 @@ DECLARAÇÃO | MECANISMO | RISCO / LIMITAÇÃO | RECOMENDAÇÃO
 `#!/usr/bin/env bash` | Utiliza o utilitário `env` para buscar a localização do interpretador dinamicamente via `$PATH`. | Nulo ou desprezível na maioria dos sistemas Unix-like modernos. | Garante portabilidade entre diferentes ambientes, contêineres e distribuições de nuvem.
 
 **Regra de Infraestrutura:** O uso de caminhos dinâmicos via `env` desacopla o script do layout físico rígido do sistema de arquivos hospedeiro, prevenindo quebras em pipelines que transitam entre ambientes locais, contêineres Docker e instâncias cloud.
+
+---
+
+### Permissões de Execução no Unix
+
+No modelo de segurança Unix, arquivos de texto nascem **sem permissão de execução** por padrão. A transformação de um arquivo `.sh` em um executável invocável via `./` exige a atribuição explícita do bit de execução (`x`) através do comando `chmod`.
+
+#### Estrutura de Permissões
+
+> `ls -l`
+
+A máscara de 10 caracteres retornada pelo comando divide-se em tipo de entrada e 3 grupos hierárquivos de privilégios:
+
+[Tipo] | [Proprietário (u)] | [Grupo (g)] | [Outros (o)]
+--- | --- | --- | ---
+`-` | rwx | r-x | r-x
+
+- **Tipo:** 
+    - `-` -> Arquivo comum;
+    - `d` -> Diretório
+- **Níveis de Acesso:**
+    - `r` (Read): Permite ler o conteúdo do arquivo.
+    - `w` (Write): Permite alterar, sobrescrever ou deletar o arquivo.
+    - `x` (Execute): Permite ao SO carregar e executar o arquivo como um processo/binário.
+
+#### Change Mode (`chmod`)
+
+- `chmod +x arquivo.sh`
+    - Concede execução a **todos** (proprietário, grupo e outros).
+    - Nível baixo de segurança.
+    - Uso para testes locais rápidos em máquinas isoladas.
+- `chmod 755 arquivo.sh
+    - Proprietário (`rwx`), Grupo (`r-x`), Outros (`r-x`).
+    - Nível médio de segurança.
+    - Uso padrão comum para binários públicos do sistema.
+- `chmod u+x arquivo.sh`
+    - Concede execução **estritamente ao proprietário**.
+    - Nível de segurança alto (Privilégio Mínimo).
+    - Caso padrão de produção corporativo em servidores e contêineres compartilhados.
