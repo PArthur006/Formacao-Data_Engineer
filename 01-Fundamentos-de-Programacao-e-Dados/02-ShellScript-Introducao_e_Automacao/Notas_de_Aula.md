@@ -91,3 +91,80 @@ A máscara de 10 caracteres retornada pelo comando divide-se em tipo de entrada 
     - Concede execução **estritamente ao proprietário**.
     - Nível de segurança alto (Privilégio Mínimo).
     - Caso padrão de produção corporativo em servidores e contêineres compartilhados.
+
+### Prática: Script de Data e Hora
+
+Abaixo é apresentada a implementação de um script prático que consolida os conceitos de shebang, saída estruturada de dados e captura dinâmica de metadados do sistema operacional através de variáveis.
+
+```bash
+#!/usr/bin/env bash
+
+# /Scripts-Exercicios_Praticos/01-HelloDate.sh
+
+# Descrição: Demontração prática de Shebang, Execução e Captura de Data
+
+# 1. Captura a data atual no formato dd/mm/aaaa hh:mm:ss
+DATA_ATUAL=$(date "+%d/%m/%Y %H:%M:%S")
+
+# 2. Exibição do resultado no terminal
+echo "Iniciando execução do pipeline de dados..."
+echo "Data e Hora da execução: ${DATA_ATUAL}"
+```
+
+O comando `date` foi avaliado dinamicamente e injetado diretamente na variável `${DATA_ATUAL}`, provendo a rastreabilidade essencial para arquivos de log de execução de pipelines.
+
+---
+
+## 2. Variáveis de Ambiente e Ingestão de Arquivos
+
+No Bash, o gerenciamento de variáveis sustenta a parametrização e o controle de fluxo de scripts. O interceptador impõe regras estritas de sintaxe de atribuição e oferece suporte a escopos globais, locais e variáveis especiais de estado/posicionamento.
+
+### Regras de Sintaxe e Escopo
+
+- **Sintaxe de Atribuição:** Proibido o uso de espaços ao redor do operador de igualdade (`VAR=valor`, e nunca `VAR = valor`).
+    - Aspas duplas (`"..."`): Permitem interpolação de variáveis e preservação de espaços em strings.
+    - Inteiros: Declarados diretamente sem aspas (ex: `COUNT=10`).
+- **Escopo Global (Padrão):** Qualquer variável declarada fora de funções (ou dentro de funções sem modificadores) é visível em qualquer ponto subsequente do script.
+- **Escopo Local (`local`):** Uso obrigatório da palavra-chave `local` dentro do corpo de funções (ex: `local temp_var="xyz"`).
+    - Objetivo: Isolar o contexto da função e evitar mutações acidentais (_side-effects_) em variáveis globais de mesmo nome.
+
+### Variáveis Especiais do Sistema
+
+- [`$0`]
+    - Nome ou caminho relativo do script em execução;
+    - Útil em logs padronizados e mensagens de ajuda (_usage/help_);
+- [`$1, $2, ... , $N`]
+    - Argumentos posicionais passados via CLI;
+    - Usado na captura de parâmetros dinâmicos (ex: `./job.sh 2026-08-25 sales`);
+- [`$#`]
+    - Quantidade total de argumentos fornecidos;
+    - útil para realizar a validação inicial de pré-requisitos antes de rodar o script;
+- [`$@`]
+    - Array com todos os argumentos como palavras individuais;
+    - Usado para Iteração segura em loops (`for arg in "$@"`);
+- [`$?`]
+    - Código de saída (_Exit Code_) do último comando;
+    - Tratamento de exceções: `0` -> Sucesso; `1 a 255` = Falha/Erro;
+
+### Segurança de Ingestão de Dados
+
+O Hardcoding de segredos no código-fonte é uma vulnerabilidade crítica de segurança. A prática correta em Engenharia de Dados consiste em desacoplar credenciais da lógica de execução, utilizando arquivos de variáveis de ambiente restritos carregados em tempo de execução via **Sourcing**.
+
+#### Riscos do Hardcoding em Ambientes de Produção
+
+- **Vazamento Instantâneo:** Commits acidentais contendo credenciais em texto claro para plataformas de controle de versão (GitHub, GitLab) são identificados por bots e scanners automatizados em segundos.
+- **Comprometimento da Infraestrutura:** Exposição direta a acessos não autorizados, exfiltração de dados confidenciais e custos abusivos em serviços de nuvem.
+
+#### Mecanismo de Sourcing (`source` ou `.`)
+
+A técnica de _sourcing_ executa comandos de um arquivo diretamente na sessão corrente do shell, sem gerar um subprocesso isolado.
+
+- **Execução Direta:**
+    - `./config.sh`;
+    - Abre um novo subprocesso (_subshell_);
+    - Sem persistência de variáveis. As variáveis são destruídas ao término do script filho.
+- **Sourcing:**
+    - `source config.env` ou `. config.env`;
+    - Roda no contexto do shell pai atual;
+    - Possui persistência de variáveis. As variáveis permanecem carregadas na memória do shell ativo.
+
