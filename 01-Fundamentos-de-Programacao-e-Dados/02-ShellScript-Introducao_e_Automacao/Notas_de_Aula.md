@@ -168,3 +168,60 @@ A técnica de _sourcing_ executa comandos de um arquivo diretamente na sessão c
     - Roda no contexto do shell pai atual;
     - Possui persistência de variáveis. As variáveis permanecem carregadas na memória do shell ativo.
 
+---
+
+## 3. Condicionais e Idempotência em Pipelines de Ingestão
+
+Em pipelines de dados, o controle de estado e a validação de metadados em nível de sistema de arquivos asseguram a integridade dos dados brutos antes do acionamento de processamentos custosos. O uso de estruturas de teste modernas (`[[ ... ]]`) e operadores de checagem física garante resiliência, prevenção de quebras por entradas mal formatadas e conformidade de segurança.
+
+### Chaves Simples vs. Chaves Duplas
+
+CARACTERÍSTICA | CHAVES SIMPLES (`[ ... ] / test`) | CHAVES DUPLAS (`[[ ... ]]`)
+--- | --- | ---
+Natureza Técnica | Programa/binário externo clássico (POSIX) | Palavra-chave nativa (_built-in_) do Bash 
+Tratamento de Espaços | Vúlnerável a quebras por word splitting sem aspas | Seguro: Trata string com espaços e nulas de forma atômica
+Expansão de Curingas | Suscetível a falhas por expansão acidental (_gloobbing_) | Protegido nativamente contra expansão indevida
+Expressões Regulares | Requer comandos e pipes externos (ex: `grep`) | Suporte nativo a regex e pattern machine (`=~, *`)
+Uso Recomendado | Scripts legados com foco estrito em portabilidade POSIX | Padrão de produção moderno em Bash para pipelines
+|||
+
+### Operadores de Validação de Metadados de Arquivos
+
+O uso de operadores dentro de `[[ ... ]]` permite inspecionar o estado físico do storage antes de disparar rotinas downstream:
+
+- **Existência e Tipo Estrutural:**
+    - `-f <caminho>`: Retorna verdadeiro se o alvo for um arquivo regular existente
+        - Ex: Valida se o `.csv`, `.parquet` ou `.json` foi despejado.
+    - `-d <caminho>`: Retorna verdadeiro se o alvo for um diretório existente
+        - Ex: Valida se as pastas `/landing`, `/staging` ou de logs estão montadas.
+- **Validação de Conteúdo Útil:**
+    - `-s <caminho>`: Retorna verdadeiro se o arquivo existir e possuir tamanho superior a 0 bytes.
+        - Aplicação: Aborta a execução para arquivos vazios, evitando custos computacionais ociosos em clusters analíticos e no Data Warehouse.
+- **Segurança e Privilégios:**
+    - `-r` (Read): Valida se o processo possui permissão de leitura
+    - `-w` (Write): Valida permissão de escrita em diretórios temporários de staging antes de gerar arquivos anonimizados/mascarados com PII.
+    - `-x` (Execute): Valida permissões de execução para scripts ou binários auxiliares.
+
+
+### Códigos de Saída (Exit Codes) como Base de Observabilidade
+
+#### Mecânica de Retorno e Tratamento de Erros
+* **Intervalo Numérico:** Todo comando finalizado no Unix retorna um código numérico de 8 bits (entre `0` e `255`). O valor `0` indica sucesso absoluto; qualquer valor diferente de zero (`1` a `255`) indica erro, falta de recursos ou terminação anormal.
+* **A Variável `$?`:** Armazena o código de saída do último comando executado. Pipelines defensivos devem inspecionar `$?` após operações críticas (como dumps de banco ou mascaramento SHA-256) e forçar uma saída com falha (`exit 1`) caso ocorra erro.
+
+#### Integração com Orquestradores (Airflow) e CI/CD
+* **Orquestradores de Tarefas:** Plataformas como Apache Airflow determinam o sucesso ou a falha de uma etapa avaliando o código de saída do processo. Omitir saídas explícitas pode mascarar falhas graves, caso a última linha executada seja um comando simples de log (`echo`) bem-sucedido.
+* **Esteiras de CI/CD (dbt):** Testes automatizados de qualidade de dados (*data quality tests*) que falham retornam códigos diferentes de zero, bloqueando a mesclagem indevida de código quebrado para a branch principal de produção.
+* **Governança e LGPD:** Se o mascaramento de PII falhar durante a ingestão, o script deve capturar o código de erro e abortar imediatamente, evitando a gravação de dados confidenciais em texto claro na camada Bronze.
+
+### O Princípio da Idempotência em Pipelines
+
+#### Definição e Resiliência a Falhas
+* **Conceito:** Um pipeline é idempotente quando sua execução repetida sob as mesmas entradas produz exatamente o mesmo resultado final, sem duplicar dados ou causar efeitos colaterais.
+* **Sobrevivência a Falhas:** Permite que retentativas automáticas (*retries*) ou execuções manuais após quedas de rede, estouros de memória (OOM) ou *timeouts* ocorram sem exigir intervenção humana para limpeza de banco.
+
+#### Estratégias no Sistema de Arquivos
+* **Limpeza Prévia de Staging:** O script deve verificar a existência de diretórios temporários e limpar resíduos de execuções incompletas anteriores antes de gravar novos lotes.
+* **Processamento Atômico e Isolamento:** Uso de arquivos com marcadores dinâmicos de data/hora para impedir a escrita concorrente sobre arquivos de produção em uso.
+* **Sobrescrita vs. Anexação:** Priorização da substituição atômica de arquivos (redirecionamento com `>`) em vez da anexação contínua (`>>`), prevenindo a duplicação descontrolada de registros em casos de reexecução.
+
