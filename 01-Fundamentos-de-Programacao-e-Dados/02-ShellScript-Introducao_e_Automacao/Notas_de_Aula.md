@@ -338,3 +338,61 @@ find /workspace/datalake/bronze/ -type f -name "*.parquet" -mtime -1
 # Busca e move os arquivos Parquet de forma segura contra quebra de nomes com espaços
 find /workspace/landing/ -type f -name "*.parquet" -print0 | xargs -0 -I {} mv {} /workspace/staging/
 ```
+
+---
+
+## 5. Funções, Sourcing e Gestão de Erros
+
+A evolução de scripts monolíticos para arquiteturas modulares é um requisito crítico para manutenibilidade, testabilidade e conformidade em pipelines de Engenharia de Dados. A separação entre declarações passivas (bibliotecas) e lógica executável desacopla responsabilidades e eleva a segurança operacional.
+
+### Modularização e Escopo em Funções
+
+#### Superação do Paradigma Monolítico
+* **Problema dos Monolíticos:** Concentração de ingestão, validações estruturais, mascaramento e logs em um único arquivo extenso, gerando alto débito técnico e dificultando a depuração.
+* **Abordagem Modular:** Isolamento de lógicas especializadas em funções reutilizáveis, garantindo código limpo, testável e manutenível.
+
+#### Sintaxe e Passagem de Parâmetros
+* **Declaração Padronizada (POSIX):** `nome_funcao() { ... }` — dispensa a palavra-chave `function`.
+* **Captura de Parâmetros:** Funções em Bash não utilizam assinaturas formais; utilizam variáveis posicionais internas (`$1`, `$2`, ..., `$N`), isoladas dos argumentos globais do script.
+
+#### Blindagem de Escopo com `local`
+* **Comportamento Padrão:** Variáveis declaradas dentro de funções possuem escopo global por padrão no Bash, o que causa sobrescritas acidentais (*side-effects*).
+* **Uso Obrigatório de `local`:** A palavra-chave `local var="$1"` restringe o ciclo de vida da variável exclusivamente à execução daquela função, prevenindo bugs de estado e colisões de nomes.
+
+### Técnicas de Sourcing e Criação de Bibliotecas
+
+#### Mecanismo de Sourcing (`source` ou `.`)
+* **Funcionamento:** Carrega, compila e disponibiliza variáveis e funções de arquivos externos diretamente na memória do processo shell pai ativo.
+* **Eficiência:** Funciona como o `import` do Python, evitando a instanciação de subprocessos desnecessários na CPU.
+
+#### Estruturação Passiva e Bloco de Guarda
+* **Boas Práticas de Design:** Bibliotecas devem conter apenas definições de funções e constantes, nunca instruções ativas de execução.
+* **Bloco de Guarda de Execução:** Protege a biblioteca contra execuções acidentais via CLI ou Cron:
+
+```bash
+  if [[ "${BASH_SOURCE[0]}" -ef "$0" ]]; then
+      echo "Erro: Este script é uma biblioteca e deve ser importado via 'source'!" >&2
+      exit 1
+  fi
+```
+
+* **Mecânica do Guarda:** Compara se o arquivo que está sendo lido (`${BASH_SOURCE[0]}`) é o mesmo do comando de invocação (`$0`) usando o operador de identidade física `-ef`.
+
+### Implementação Prática: Ecossistema Modular de Data Quality
+
+#### Biblioteca Auxiliar (`lib_data_quality.sh`)
+
+* **Integridade Física (`check_file_physical_integrity`):** Valida se o parâmetro foi informado (`-z`), se o arquivo existe (`-f`) e se possui tamanho superior a 0 bytes (`-s`), retornando códigos de erro específicos (`1`, `2`, `3`).
+* **Validação Estrutural de Esquema (`validate_csv_format`):** Extrai a primeira linha (`head -n 1`), conta os delimitadores com `tr -cd ',' | wc -c` e valida se a contagem de colunas atende ao mínimo exigido pelo negócio.
+* **Segurança e LGPD (`hash_pii_value`):** Realiza a anonimização irreversível de campos sensíveis (como e-mails) em trânsito (*in-flight*) utilizando criptografia `openssl dgst -sha256`.
+* **Observabilidade e Logs (`send_pipeline_alert`):** Padroniza mensagens com *timestamp*, direcionando logs operacionais de sucesso para `stdout` e falhas para `stderr` (`>&2`).
+
+#### Pipeline Executável Principal (`etl_pipeline.sh`)
+
+* **Resiliência Estrita com `set -o pipefail`:**
+    * **Problema Sem o Flag:** Em comandos encadeados por pipes (`cmd1 | cmd2`), o shell retorna apenas o código de saída do último comando (`cmd2`), mascarando erros críticos intermediários (ex.: falha de memória no `openssl` ignorada porque o `awk` final teve êxito).
+    * **Comportamento com `pipefail`:** O retorno (`$?`) herda a falha de qualquer comando intermediário da esteira, impedindo o trânsito de dados corrompidos ou PII em texto claro.
+* **Resolução Dinâmica de Diretórios:** Uso de `dirname "$(readlink -f "$0")"` para garantir caminhos absolutos confiáveis, independentemente do diretório de onde o job foi disparado.
+* **Validação em Cascata:** Checagem estrita de integridade física e de formato antes de iniciar transformações, abortando o pipeline com códigos de saída específicos em caso de divergência estrutural.
+* **Transformação Linha a Linha:** Leitura segura via `tail -n +2 | while IFS=',' read -r`, aplicando a função de hashing importada e persistindo a saída anonimizada na *Staging Area* (Silver).
+* **Validação Pós-Carga:** Checagem física final do arquivo de saída gerado antes de notificar o sucesso para ferramentas de orquestração downstream (como Apache Airflow).
