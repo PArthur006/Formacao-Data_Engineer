@@ -225,3 +225,116 @@ O uso de operadores dentro de `[[ ... ]]` permite inspecionar o estado físico d
 * **Processamento Atômico e Isolamento:** Uso de arquivos com marcadores dinâmicos de data/hora para impedir a escrita concorrente sobre arquivos de produção em uso.
 * **Sobrescrita vs. Anexação:** Priorização da substituição atômica de arquivos (redirecionamento com `>`) em vez da anexação contínua (`>>`), prevenindo a duplicação descontrolada de registros em casos de reexecução.
 
+---
+
+## 4. Loops, Processamento em Lote e Manipulação de Arquivos
+
+As estruturas de repetição sustentam a automação de pipelines em lote, permitindo iterar sobre coleções de dados, sequências numéricas e arquivos sem duplicação de código. No Bash, destacam-se as variações do loop `for` e o processamento sequencial baseado em condições com `while`.
+
+### Variações e Sintaxe do Loop For
+
+#### Loop For-In (Estilo Iterativo)
+* **Mecânica:** Itera sequencialmente sobre uma lista explícita de elementos, strings ou arrays.
+* **Funcionamento:** A cada iteração, o interpretador extrai um elemento da coleção, atribui à variável de controle e executa o bloco delimitado por `do` e `done`.
+* **Aplicação:** Processamento de listas delimitadas (ex.: listas de tabelas, partições de datas ou nomes de arquivos de entrada).
+
+```bash
+for item in "fuji" "gala" "red_delicious"; do
+    echo "Processando variedade: ${item}"
+done
+```
+
+#### Loop For no Estilo C (Aritmético)
+* **Mecânica:** Utiliza controle aritmético explícito com três expressões encapsuladas em parênteses duplos `(( inicialização; condição; incremento ))`.
+* **Vantagem Técnica:** Elimina a necessidade de expansão de strings para sequências numéricas, proporcionando melhor desempenho em iterações puramente matemáticas ou controle de índices de matrizes.
+* **Aplicação:** Execuções baseadas em contadores numéricos rígidos, limites de lotes (*batches*) e manipulação de índices de arrays.
+
+```bash
+limite=10
+for ((i=0; i<limite; i++)); do
+    echo "Índice de processamento: ${i}"
+done
+```
+
+### O Loop While e Processamento Baseado em Condições
+
+#### Leitura Sequencial com `while read`
+* **Mecânica:** Mantém a execução ativa enquanto a condição avaliada for verdadeira.
+* **Eficiência de Memória:** A combinação `while read` consome fluxos de texto linha por linha (usando `\n` como delimitador natural), evitando carregar arquivos massivos inteiramente na memória RAM do servidor.
+* **Parâmetro Crítico (`read -r`):** O uso da flag `-r` é obrigatório para desativar a interpretação de barras invertidas (*backslashes*) como caracteres de escape, preservando a integridade literal dos dados originais.
+
+```bash
+while IFS= read -r linha; do
+    echo "Processando: $linha"
+done < "arquivo.txt"
+```
+
+#### Segurança e Anonimização em Tempo de Execução (LGPD)
+* **Interpretação *In-Flight*:** A leitura linha a linha permite interceptar registros durante o trânsito antes da gravação em disco.
+* **Tratamento de PII:** Viabiliza o isolamento de colunas sensíveis (como e-mails e CPFs) para aplicação imediata de hashing unidirecional (SHA-256) ou mascaramento, persistindo apenas os dados anonimizados na área de *Staging*.
+
+### Processamento em Lote (Batch) e Globbing
+
+O processamento eficiente e seguro de grandes volumes de dados no terminal Unix exige o domínio de mecanismos nativos de expansão (*globbing*), ferramentas de edição de fluxo de baixo consumo de memória (AWK e SED) e utilitários escaláveis de busca e paralelização (*find* e *xargs*).
+
+#### Mecânica do Globbing
+* **Expansão Nativa:** O *globbing* expande caracteres curinga (como `*` e `?`) em listas de caminhos correspondentes diretamente no shell antes de invocar o comando ou loop.
+    - Ex: `/workspace/landing/*.csv`
+    - Ex: `for arquivo in /data/*.parquet; do ... done`
+* **Eficiência Computacional:** Ao contrário de abordagens que delegam a avaliação de padrões para bibliotecas externas em tempo de execução, a expansão prévia pelo próprio interpretador reduz chamadas redundantes ao sistema operacional e otimiza o uso de memória do kernel.
+* **Uso de `nullglob`:** A ativação de `shopt -s nullglob` evita falhas quando nenhum arquivo corresponde ao padrão, impedindo que a string literal com asterisco seja repassada indevidamente para dentro do loop.
+
+#### Automação Segura e Idempotência (LGPD)
+* **Validação Prévia de Metadados:** Verificação via `[[ -s "$arquivo" ]]` para ignorar arquivos vazios (0 bytes), economizando processamento computacional.
+* **Garantia de Idempotência:** Uso de redirecionamento simples (`>`) na geração dos arquivos processados para sobrescrever e recriar o estado do *staging* de forma limpa a cada reexecução.
+* **Auditoria e Isolamento:** Movimentação imediata dos arquivos brutos processados para pastas de arquivo/histórico, prevenindo reprocessamentos duplicados acidentais e isolando dados sensíveis.
+
+### Manipulação de Arquivos e Textos de Alta Performance: AWK e SED
+
+#### AWK: Processamento Tabular Dinâmico em Streaming
+* **Arquitetura em Linha:** Linguagem interpretada orientada a padrões que processa arquivos linha por linha, permitindo filtrar e agregar arquivos gigantescos (CSVs e logs) sem carregar o conjunto completo na memória RAM.
+* **Mapeamento Posicional de Campos:**
+  * `$0`: Linha inteira em processamento.
+  * `$1, $2, ..., $N`: Variáveis posicionais que mapeiam as colunas do registro.
+* **Definição de Delimitadores (`-F`):** O parâmetro `-F` define o separador específico de colunas (ex.: `-F','` para CSVs ou `-F':'` para `/etc/passwd`).
+* **Estrutura de Ação:** Opera sob o modelo `condição { ação }`, permitindo filtrar registros ruidosos de logs e extrair chaves estruturadas diretamente para a camada de *staging*.
+
+```bash
+# Exemplo: Extrair a coluna de usuário ($1) e shell ($7) de arquivos delimited por ":"
+awk -F':' '{print $1 " usa o shell: " $7}' /etc/passwd
+```
+
+#### SED: Edição Não Interativa de Fluxo
+* **Função Principal:** Executa transformações, exclusões e substituições rápidas de padrões de caracteres em streams de texto ou arquivos brutos.
+* **Casos de Uso em Dados:** Correção de codificações incorretas, remoção de quebras de linha no padrão Windows (`\r\n`) e padronização de campos numéricos/monetários antes da carga no banco de dados.
+* **Sintaxe de Substituição Global:** O padrão `sed 's/padrão/novo_valor/g'` aplica a troca em todas as ocorrências encontradas na linha (modificador `g`).
+
+```bash
+# Remove o caractere de cifrão e normaliza os delimitadores de casa decimal
+cat dados_brutos.txt | sed 's/\$ //g' | sed 's/\.//g' | sed 's/,/./g'
+```
+
+### Varredura Estruturada e Paralelização: Find e Xargs
+
+#### Busca Avançada com `find`
+* **Varredura Recursiva por Metadados:** Localiza arquivos com base em atributos estruturais do sistema de arquivos sem depender de listas carregadas em memória.
+* **Filtros Estruturais Críticos:**
+  * `-type f` / `-type d`: Restringe a busca exclusivamente a arquivos regulares ou diretórios.
+  * `-mtime` / `-mmin`: Filtra por data de modificação em dias ou minutos (essencial para isolar arquivos das últimas 24h em cargas incrementais).
+  * `-name`: Filtra por padrões de nome (sempre protegido por aspas para evitar que o shell execute o *globbing* prematuramente).
+
+```bash
+# Busca arquivos Parquet modificados estritamente nas últimas 24 horas no Data Lake local
+find /workspace/datalake/bronze/ -type f -name "*.parquet" -mtime -1
+```
+
+#### Paralelização e Escala com `xargs`
+* **Mitigação do Erro `Argument list too long`:** Converte fluxos de texto da entrada padrão (*stdin*) em lotes gerenciáveis de argumentos, permitindo processar milhões de arquivos sem estourar o limite de buffer do terminal.
+* **Padrão Seguro para Espaços em Branco (`-print0` e `-0`):**
+  * `find ... -print0`: Utiliza o byte nulo (`\0`) como delimitador entre os arquivos encontrados.
+  * `xargs -0`: Interpreta o byte nulo como separador, neutralizando quebras de execução e riscos de segurança causados por nomes de arquivos contendo espaços em branco ou quebras de linha acidentais.
+
+```bash
+# Busca e move os arquivos Parquet de forma segura contra quebra de nomes com espaços
+find /workspace/landing/ -type f -name "*.parquet" -print0 | xargs -0 -I {} mv {} /workspace/staging/
+```
