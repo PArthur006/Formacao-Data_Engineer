@@ -1,12 +1,15 @@
 #!/bin/bash
 
+# Configurações de diretórios
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LANDING_DIR="$BASE_DIR/data/landing"
 RAW_DIR="$BASE_DIR/data/raw/$(date +%F)"
 QUARANTINE_DIR="$BASE_DIR/data/quarantine"
 LOG_FILE="$BASE_DIR/logs/pipeline.log"
 
+# Garante a existência dos diretórios necessários
 mkdir -p "$LANDING_DIR" "$RAW_DIR" "$QUARANTINE_DIR" "$BASE_DIR/logs"
+
 log() {
     local nivel="$1"
     local msg="$2"
@@ -18,11 +21,13 @@ log() {
 validate_csv() {
     local arquivo="$1"
 
+    # 1. Verifica se existe e não está vazio
     if [[ ! -s "$arquivo" ]]; then
         log "WARN" "Arquivo vazio ou inacessível: $(basename "$arquivo")"
         return 1
     fi
 
+    # 2. Verifica se tem mais de 1 linha (pelo menos cabeçalho + 1 registro)
     local total_linhas
     total_linhas=$(wc -l < "$arquivo")
     if (( total_linhas <= 1 )); then
@@ -36,6 +41,7 @@ validate_csv() {
 process_files() {
     log "INFO" "Iniciando esteira de ingestão..."
 
+    # Itera sobre arquivos csv na landing zone
     shopt -s nullglob
     local arquivos=("$LANDING_DIR"/*.csv)
     shopt -u nullglob
@@ -62,4 +68,6 @@ process_files() {
 
     log "INFO" "Esteira finalizada com sucesso."
 }
+
+# Execução do pipeline
 process_files
