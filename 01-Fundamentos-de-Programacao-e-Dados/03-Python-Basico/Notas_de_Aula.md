@@ -115,3 +115,95 @@ log_seguro = {
 # Impressão segura do log em formato JSON
 print(json.dumps(log_seguro))
 ```
+
+---
+
+## 3. Variáveis, Tipos de Dados e Governança de Esquemas em Python
+
+O domínio de tipos de dados em Python é a base para garantir a integridade estrutural entre scripts de extração/transformação e tabelas físicas em bancos analíticos. A tipagem correta previne *Schema Drift*, garante precisão em métricas financeiras e assegura conformidade com leis de privacidade (LGPD/GDPR).
+
+### Modelo de Memória e Tipagem do Python
+
+#### Referências de Memória e Dinâmica do Heap
+* **Ponteiros de Memória:** Variáveis em Python funcionam como referências que apontam para objetos alocados dinamicamente no *heap*.
+* **Tipagem Dinâmica:** O interpretador infere o tipo do dado em tempo de execução com base no valor atribuído, dispensando declarações estáticas prévias.
+* **Tipagem Forte:** Operações implícitas entre tipos incompatíveis (ex.: somar `str` com `int`) são bloqueadas, exigindo coerção explícita de tipos no código do pipeline para evitar quebras em produção.
+
+### Tipos Primitivos e Mapeamento para Data Warehouses (OLAP)
+
+#### Tabela de Correspondência Estrutural
+| Tipo Python | Classe | Equivalente no DW / OLAP | Caso de Uso em Dados |
+| :--- | :--- | :--- | :--- |
+| `int` | `int` | `INTEGER` / `BIGINT` | Chaves substitutas (*surrogate keys*), IDs, contagens. |
+| `float` | `float` | `FLOAT` / `DOUBLE PRECISION` | Coordenadas geográficas, taxas percentuais, sensores. |
+| `str` | `str` | `VARCHAR` / `TEXT` | Nomes, descrições, chaves textuais, URLs. |
+| `bool` | `bool` | `BOOLEAN` | Flags de estado (`is_active`, `is_deleted`). |
+| `None` | `NoneType` | `NULL` | Valores ausentes, campos opcionais, nulos relacionais. |
+
+#### Prevenção de Desalinhamento de Esquema (*Schema Drift*)
+* **Falhas de Transação:** A presença de strings residuais (`'N/A'`, `'R$ 100,00'`) em colunas mapeadas como numéricas provoca rejeição imediata da carga em lote no Data Warehouse.
+* **Proibição de `float` em Cálculos Financeiros:** Devido à representação binária fracionária do padrão IEEE 754, `float` gera imprecisões decimais acumuladas. Em relatórios financeiros, é obrigatório o uso do módulo nativo `decimal.Decimal` (ponto fixo).
+
+#### Tratamento de Ausência de Dados (`None` vs. Strings Vazias)
+* **Distinção Crítica:** O objeto `None` deve ser mapeado explicitamente para o `NULL` do SQL.
+* **Impacto Analítico:** Persistir dados ausentes como strings vazias (`""`) compromete *outer joins*, distorce agregações estatísticas (como `AVG` e `STDDEV`) e mascara a contagem real de registros ausentes.
+
+### Operações Aritméticas e Manipulação de Chaves
+
+#### Operadores Críticos em Processamento de Dados
+* **Divisão Real (`/`):** Sempre converte o resultado para `float` no Python 3 (ex.: `4 / 2` resulta em `2.0`), exigindo atenção para não mutar esquemas de colunas inteiras.
+* **Divisão de Piso (`//`):** Trunca o resultado decimal e retorna apenas a porção inteira.
+* **Módulo (`%`):** Retorna o resto da divisão. Amplamente utilizado em pipelines para balanceamento de carga e partição lógica de dados entre múltiplos *threads* ou processos distribuídos (`id % total_threads`).
+
+#### Interpolação Dinâmica e Surrogate Keys
+* **Uso de f-strings:** Abordagem padrão para concatenação de strings; avalia expressões em tempo de execução com performance superior e coerção de tipos automática.
+* **Geração de Chaves Compostas:** Concatenação de atributos textuais (ex.: `f"{loja_id}_{cliente_id}"`) para criação de chaves unificadas e alimentação de chaves substitutas (*Surrogate Keys*) em modelagens dimensionais de Kimball.
+
+### Segurança e Compliance LGPD: Mascaramento com hashlib e SHA-256
+
+#### Anonimização Irreversível de PII
+* **Proteção na Borda:** Dados pessoais identificáveis (CPFs, e-mails, telefones) não devem transitar ou persistir em texto claro. Quando necessários para integridade analítica e cruzamentos, devem ser submetidos a *hashing* unidirecional (SHA-256) em memória.
+
+#### Regra de Ouro da Normalização Pré-Hash
+* **Efeito Avalanche:** Qualquer divergência em espaços residuais ou letras maiúsculas/minúsculas altera completamente a saída do hash.
+* **Protocolo de Higienização Obrigatório:**
+  1. `strip()`: Elimina espaços em branco no início e no final da string.
+  2. `lower()`: Padroniza os caracteres para caixa baixa.
+  3. Limpeza de caracteres não numéricos em documentos (ex.: remoção de `.` e `-` de CPFs).
+  4. `.encode("utf-8")`: Converte a string tratada para o formato de bytes exigido pela biblioteca `hashlib`.
+
+```python
+import hashlib
+
+# Dados brutos de exemplo
+email_bruto = "  Carlos.Souza@provedor.com  "
+cpf_bruto = "123.456.789-01"
+
+# 2. Normalização dos dados
+"""
+    strip() - Remove espaços em branco no início e no fim da string
+    lower() - Converte todos os caracteres para minúsculas
+"""
+email_normalizado = email_bruto.strip().lower()
+
+# Removendo caracteres não numéricos do CPF
+cpf_normalizado = cpf_bruto.replace(".", "").replace("-", "").strip()
+
+# 3. Geração de Hashing SHA-256 via hashlib
+"""
+    O hashlib exige que a string vire bytes para gerar o hash. Isso é feito com o método encode('utf-8').
+"""
+email_bytes = email_normalizado.encode('utf-8')
+email_hash = hashlib.sha256(email_bytes).hexdigest()
+
+cpf_bytes = cpf_normalizado.encode('utf-8')
+cpf_hash = hashlib.sha256(cpf_bytes).hexdigest()
+
+# 4. Saída segura dos resultados
+print(f"Email normalizado e hasheado: {email_hash}")
+print(f"CPF normalizado e hasheado: {cpf_hash}")
+
+```
+
+---
+
