@@ -28,7 +28,5 @@ Formacao-Data_Engineer/
 
 - Trilhas: agrupam os temas principais da formação.
 - Módulos: subdividem cada trilha em blocos de aprendizado.
-- Aulas: concentram anotações, exemplos e exercícios de cada tópico.
-- Anotações: registram conceitos, comandos, boas práticas e dúvidas importantes.
+- Anotações: registram conceitos, comandos, boas práticas e dúvidas importantes de cada tópico.
 - Exercícios: guardam resoluções, testes práticos e pequenas entregas para fixação.
-
